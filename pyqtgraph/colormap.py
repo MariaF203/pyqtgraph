@@ -3,12 +3,16 @@ from os import listdir, path
 
 import numpy as np
 
+from serializall.factory import SerializableFactory, SerializableBase
+
 from .functions import clip_array, clip_scalar, colorDistance, eq, mkColor
 from .Qt import QtCore, QtGui
 
 __all__ = ['ColorMap']
 
 _mapCache = {}
+
+ser_factory = SerializableFactory()
 
 def listMaps(source=None):
     """
@@ -334,7 +338,8 @@ def modulatedBarData(length=768, width=32):
     clip_array(data, 0.0, 1.0, out=data)
     return data
 
-class ColorMap(object):
+@SerializableFactory.register_decorator()
+class ColorMap(SerializableBase, object):
     """
     ColorMap(pos, color, mapping=ColorMap.CLIP)
 
@@ -844,3 +849,30 @@ class ColorMap(object):
         if other is None:
             return False
         return eq(self.pos, other.pos) and eq(self.color, other.color)
+
+    @staticmethod
+    def serialize(color_map) -> bytes:
+        """ Implement the Parameter type serialization """
+        bytes_string = b''
+
+        bytes_string += ser_factory.get_apply_serializer(color_map.pos)
+        bytes_string += ser_factory.get_apply_serializer(color_map.color)
+        bytes_string += ser_factory.get_apply_serializer(color_map.mapping_mode)
+        bytes_string += ser_factory.get_apply_serializer(color_map.name)
+        bytes_string += ser_factory.get_apply_serializer(color_map.stopsCache)
+
+        return bytes_string
+
+    @staticmethod
+    def deserialize(bytes_string: bytes):
+        """ Implement the deserialization into a Parameter object from bytes """
+        pos, remaining_bytes = ser_factory.get_apply_deserializer(bytes_string, only_object=False)
+        color, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, only_object=False)
+        mapping_mode, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, only_object=False)
+        name, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, only_object=False)
+        stopsCache, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, only_object=False)
+
+        color_map = ColorMap(pos=pos, color=color, mapping=mapping_mode, name=name)
+        color_map.stopsCache = stopsCache
+
+        return color_map, remaining_bytes

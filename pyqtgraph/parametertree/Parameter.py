@@ -3,6 +3,8 @@ import warnings
 import weakref
 from collections import OrderedDict
 
+from serializall.factory import SerializableFactory, SerializableBase
+
 from .. import functions as fn
 from ..Qt import QtCore
 from .ParameterItem import ParameterItem
@@ -12,6 +14,7 @@ PARAM_NAMES = {}
 
 _PARAM_ITEM_TYPES = {}
 
+ser_factory = SerializableFactory()
 
 def registerParameterItemType(name, itemCls, parameterCls=None, override=False):
     """
@@ -30,6 +33,9 @@ def registerParameterItemType(name, itemCls, parameterCls=None, override=False):
     _PARAM_ITEM_TYPES[name] = itemCls
     registerParameterType(name, parameterCls, override)
 
+    # TODO register only in registerParameterType() or here too
+    ser_factory.register_from_type(itemCls, Parameter.serialize, Parameter.deserialize)
+
 
 def registerParameterType(name, cls, override=False):
     """Register a parameter type in the parametertree system.
@@ -43,13 +49,17 @@ def registerParameterType(name, cls, override=False):
     PARAM_TYPES[name] = cls
     PARAM_NAMES[cls] = name
 
+    # TODO Can I let this to register the subclasses or should I do it in another way
+    ser_factory.register_from_type(cls, Parameter.serialize, Parameter.deserialize)
+
 
 def __reload__(old):
     PARAM_TYPES.update(old.get('PARAM_TYPES', {}))
     PARAM_NAMES.update(old.get('PARAM_NAMES', {}))
 
 
-class Parameter(QtCore.QObject):
+@SerializableFactory.register_decorator()
+class Parameter(QtCore.QObject, SerializableBase):
     """
     A Parameter is the basic unit of data in a parameter tree. Each parameter has
     a name, a type, a value, and several other properties that modify the behavior of the 
@@ -647,8 +657,13 @@ class Parameter(QtCore.QObject):
         If 'autoIncrementName' is *False*, an error is raised when the inserted child already exists. However, if
         'existOk' is *True*, the existing child will be returned instead, and this child will *not* be inserted.
         """
+
+        # PART WE ADDED
         if isinstance(child, dict):
             child = Parameter.create(**child)
+        elif child.type() and not isinstance(child, PARAM_TYPES[child.type()]):
+                raise TypeError('The dfbgsdfgd')
+        # END PART WE ADDED
         
         name = child.name()
         if name in self.names and child is not self.names[name]:
@@ -863,6 +878,20 @@ class Parameter(QtCore.QObject):
             self.treeStateChanges = []
             if len(changes) > 0:
                 self.sigTreeStateChanged.emit(self, changes)
+
+
+    @staticmethod
+    def serialize(parameter) -> bytes:
+        """ Implement the Parameter type serialization """
+        st = parameter.saveState()
+        return ser_factory.get_apply_serializer(st)
+
+
+    @staticmethod
+    def deserialize(bytes_string: bytes):
+        """ Implement the deserialization into a Parameter object from bytes """
+        deserialized_param, remaining_bytes = ser_factory.get_apply_deserializer(bytes_string, only_object=False)
+        return Parameter.create(**deserialized_param), remaining_bytes
 
 
 class SignalBlocker(object):

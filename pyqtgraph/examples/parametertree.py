@@ -16,14 +16,14 @@ from pyqtgraph.Qt import QtWidgets
 
 app = pg.mkQApp("Parameter Tree Example")
 import pyqtgraph.parametertree.parameterTypes as pTypes
-from pyqtgraph.parametertree import Parameter, ParameterTree
+from pyqtgraph.parametertree import Parameter, ParameterTree, registerParameterType
 
 
 ## test subclassing parameters
 ## This parameter automatically generates two child parameters which are always reciprocals of each other
 class ComplexParameter(pTypes.GroupParameter):
     def __init__(self, **opts):
-        opts['type'] = 'bool'
+        opts['type'] = 'complexparameter' # here it was 'bool' before
         opts['value'] = True
         pTypes.GroupParameter.__init__(self, **opts)
         
@@ -40,12 +40,20 @@ class ComplexParameter(pTypes.GroupParameter):
     def bChanged(self):
         self.a.setValue(1.0 / self.b.value(), blockSignal=self.aChanged)
 
+    def saveState(self, filter=None):
+        # Unlike the normal GroupParameter, child states shouldn't be separately
+        # preserved
+        state = super().saveState(filter)
+        state.pop("children", None)
+        return state
+
+
 
 ## test add/remove
 ## this group includes a menu allowing the user to add new parameters into its child list
 class ScalableGroup(pTypes.GroupParameter):
     def __init__(self, **opts):
-        opts['type'] = 'group'
+        opts['type'] = 'scalablegroup'
         opts['addText'] = "Add"
         opts['addList'] = ['str', 'float', 'int']
         pTypes.GroupParameter.__init__(self, **opts)
@@ -61,8 +69,15 @@ class ScalableGroup(pTypes.GroupParameter):
 
 
 
+all_types = makeAllParamTypes()
+
+# here we register the new Parameter types with the associated class and in insertChild we check if the 'type'
+# attribute of the child match the class registered in PARAM_TYPES, otherwise se raise a TypeError
+registerParameterType('scalablegroup', ScalableGroup)
+registerParameterType('complexparameter', ComplexParameter)
+
 params = [
-    makeAllParamTypes(),
+    all_types,
     {'name': 'Save/Restore functionality', 'type': 'group', 'children': [
         {'name': 'Save State', 'type': 'action'},
         {'name': 'Restore State', 'type': 'action', 'children': [
@@ -89,6 +104,29 @@ params = [
 
 ## Create tree of Parameter objects
 p = Parameter.create(name='params', type='group', children=params)
+
+
+""""# TODO TEST
+
+#p2 = Parameter.create(name='params', type='group')
+#print(f'Test same same {pg.eq(p.saveState(), p.saveState())}')
+#p2.restoreState(p.saveState())
+#print(f'Test same {pg.eq(p.saveState(), p2.saveState())}')
+
+from serializall.factory import SerializableFactory
+
+ser_factory = SerializableFactory()
+ser = ser_factory.get_apply_serializer(p)
+param_back = ser_factory.get_apply_deserializer(ser)
+p_state = p.saveState()
+p_back_state = param_back.saveState()
+print(f'Test deserialize {pg.eq(p_state, p_back_state)}')
+print(p.children())
+print(param_back.children())
+#p = param_back
+
+# TODO END TEST"""
+
 
 ## If anything changes in the tree, print a message
 def change(param, changes):
@@ -148,6 +186,7 @@ state = p.saveState()
 p.restoreState(state)
 compareState = p.saveState()
 assert pg.eq(compareState, state)
+
 
 if __name__ == '__main__':
     pg.exec()
