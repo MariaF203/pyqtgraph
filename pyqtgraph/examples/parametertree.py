@@ -23,7 +23,7 @@ from pyqtgraph.parametertree import Parameter, ParameterTree, registerParameterT
 ## This parameter automatically generates two child parameters which are always reciprocals of each other
 class ComplexParameter(pTypes.GroupParameter):
     def __init__(self, **opts):
-        opts['type'] = 'complexparameter' # here it was 'bool' before
+        opts['type'] = 'complexparam'
         opts['value'] = True
         pTypes.GroupParameter.__init__(self, **opts)
         
@@ -67,9 +67,10 @@ class ScalableGroup(pTypes.GroupParameter):
         self.addChild(dict(name="ScalableParam %d" % (len(self.childs)+1), type=typ, value=val, removable=True, renamable=True))
 
 
+all_params_types = makeAllParamTypes()
 
-
-all_types = makeAllParamTypes()
+registerParameterType('complexparam', ComplexParameter)
+registerParameterType('scalablegroup', ScalableGroup)
 
 # here we register the new Parameter types with the associated class and in insertChild we check if the 'type'
 # attribute of the child match the class registered in PARAM_TYPES, otherwise se raise a TypeError
@@ -77,7 +78,7 @@ registerParameterType('scalablegroup', ScalableGroup)
 registerParameterType('complexparameter', ComplexParameter)
 
 params = [
-    all_types,
+    all_params_types,
     {'name': 'Save/Restore functionality', 'type': 'group', 'children': [
         {'name': 'Save State', 'type': 'action'},
         {'name': 'Restore State', 'type': 'action', 'children': [
