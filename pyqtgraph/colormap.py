@@ -7,6 +7,7 @@ from serializall.factory import SerializableFactory, SerializableBase
 
 from .functions import clip_array, clip_scalar, colorDistance, eq, mkColor
 from .Qt import QtCore, QtGui
+from .Qt.QtGui import QColor
 
 __all__ = ['ColorMap']
 
@@ -418,6 +419,10 @@ class ColorMap(SerializableBase, object):
         if mapping is not None:
             self.setMappingMode( mapping )
         self.stopsCache = {}
+
+        # TODO add bool to keep info for ser/des
+        self.linearized = linearize
+
         if linearize: self.linearize()
 
     def setMappingMode(self, mapping):
@@ -853,6 +858,7 @@ class ColorMap(SerializableBase, object):
     @staticmethod
     def serialize(color_map) -> bytes:
         """ Implement the Parameter type serialization """
+
         bytes_string = b''
 
         bytes_string += ser_factory.get_apply_serializer(color_map.pos)
@@ -860,6 +866,7 @@ class ColorMap(SerializableBase, object):
         bytes_string += ser_factory.get_apply_serializer(color_map.mapping_mode)
         bytes_string += ser_factory.get_apply_serializer(color_map.name)
         bytes_string += ser_factory.get_apply_serializer(color_map.stopsCache)
+        bytes_string += ser_factory.get_apply_serializer(color_map.linearized)
 
         return bytes_string
 
@@ -871,8 +878,18 @@ class ColorMap(SerializableBase, object):
         mapping_mode, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, only_object=False)
         name, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, only_object=False)
         stopsCache, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, only_object=False)
+        linearized, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, only_object=False)
 
-        color_map = ColorMap(pos=pos, color=color, mapping=mapping_mode, name=name)
+        # TODO solution 1 for color deserialization (or smth like that in serialize instead of here)
+        rgba_color = []
+        for c in color:
+            rgba_color.append(QColor.fromRgbF(*c))
+
+        color_map = ColorMap(pos=pos, color=rgba_color, mapping=mapping_mode, name=name, linearize=linearized)
+
+        # TODO solution 2 for color deserialization
+        #color_map.color = color
+
         color_map.stopsCache = stopsCache
 
         return color_map, remaining_bytes
