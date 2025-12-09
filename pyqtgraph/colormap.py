@@ -2,6 +2,7 @@ from collections.abc import Callable, Sequence
 from os import listdir, path
 
 import numpy as np
+from collections import OrderedDict
 
 from serializall.factory import SerializableFactory, SerializableBase
 
@@ -855,8 +856,41 @@ class ColorMap(SerializableBase, object):
             return False
         return eq(self.pos, other.pos) and eq(self.color, other.color)
 
+
+    def saveState(self, filter=None):
+        """
+        Return a structure representing the entire state of the parameter tree.
+        The tree state may be restored from this structure using restoreState().
+
+        If *filter* is set to 'user', then only user-settable data will be included in the
+        returned state.
+        """
+        if filter is None:
+            state = self.opts.copy()
+            if state['type'] is None:
+                global PARAM_NAMES
+                state['type'] = PARAM_NAMES.get(type(self), None)
+
+            rgba_color = []
+            for c in state['color']:
+                rgba_color.append(QColor.fromRgbF(*c))
+            state['color'] = rgba_color
+
+        elif filter == 'user':
+            if self.hasValue():
+                state = {'value': self.value()}
+            else:
+                state = {}
+        else:
+            raise ValueError(f"Unrecognized filter argument: '{filter}'")
+
+        ch = OrderedDict([(ch.name(), ch.saveState(filter=filter)) for ch in self])
+        if len(ch) > 0:
+            state['children'] = ch
+        return state
+
     @staticmethod
-    def serialize(color_map) -> bytes:
+    def serialize(color_map: 'ColorMap') -> bytes:
         """ Implement the Parameter type serialization """
 
         bytes_string = b''

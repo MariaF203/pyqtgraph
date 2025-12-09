@@ -48,7 +48,6 @@ class ComplexParameter(pTypes.GroupParameter):
         return state
 
 
-
 ## test add/remove
 ## this group includes a menu allowing the user to add new parameters into its child list
 class ScalableGroup(pTypes.GroupParameter):
@@ -71,11 +70,6 @@ all_params_types = makeAllParamTypes()
 
 registerParameterType('complexparam', ComplexParameter)
 registerParameterType('scalablegroup', ScalableGroup)
-
-# here we register the new Parameter types with the associated class and in insertChild we check if the 'type'
-# attribute of the child match the class registered in PARAM_TYPES, otherwise se raise a TypeError
-registerParameterType('scalablegroup', ScalableGroup)
-registerParameterType('complexparameter', ComplexParameter)
 
 params = [
     all_params_types,
@@ -106,88 +100,151 @@ params = [
 ## Create tree of Parameter objects
 p = Parameter.create(name='params', type='group', children=params)
 
+############################################################################
+# TESTS
+############################################################################
 
-""""# TODO TEST
-
-#p2 = Parameter.create(name='params', type='group')
-#print(f'Test same same {pg.eq(p.saveState(), p.saveState())}')
-#p2.restoreState(p.saveState())
-#print(f'Test same {pg.eq(p.saveState(), p2.saveState())}')
+from timeit import default_timer as timer
+import sys
 
 from serializall.factory import SerializableFactory
+from pyqtgraph.parametertree.utils import compare_parameters
 
-ser_factory = SerializableFactory()
-ser = ser_factory.get_apply_serializer(p)
-param_back = ser_factory.get_apply_deserializer(ser)
-p_state = p.saveState()
-p_back_state = param_back.saveState()
-print(f'Test deserialize {pg.eq(p_state, p_back_state)}')
-print(p.children())
-print(param_back.children())
-#p = param_back
+enc = Parameter.to_json(p)
+dec = Parameter.from_json(enc)
 
-# TODO END TEST"""
+print(compare_parameters(p, dec))
 
 
-## If anything changes in the tree, print a message
-def change(param, changes):
-    print("tree changes:")
-    for param, change, data in changes:
-        path = p.childPath(param)
-        if path is not None:
-            childName = '.'.join(path)
-        else:
-            childName = param.name()
-        print('  parameter: %s'% childName)
-        print('  change:    %s'% change)
-        print('  data:      %s'% str(data))
-        print('  ----------')
-    
-p.sigTreeStateChanged.connect(change)
+# ser_factory = SerializableFactory()
+# # ser_p = ser_factory.get_apply_serializer(p)
+# # restored_p = ser_factory.get_apply_deserializer(ser_p)
+#
+#
+# start = timer()
+# state = p.saveState()
+# res_json = json.dumps(state)
+# restored = p.restoreState(json.loads(res_json))
+# end = timer()
+# json_time = end - start
+# print(f'JSON: {json_time} seconds')
+# print(f'JSON object size: {len(res_json)}')
+#
+# start = timer()
+# res_binary = ser_factory.get_apply_serializer(p)
+# restored = ser_factory.get_apply_deserializer(res_binary)
+# end = timer()
+# binary_time = end - start
+# print(f'Binary: {binary_time} seconds')
+# print(f'Binary object size: {len(res_binary)}')
+#
+# if json_time > binary_time:
+#     print(f'Fastest: Binary')
+# else:
+#     print(f'Fastest: JSON')
+#
+#
+# def get_leaf_list(param: Parameter) -> list:
+#     leafs = list()
+#
+#     def get_leaf_rec(param: Parameter, leafs: list):
+#         if not param.children():
+#             leafs.append(param)
+#         else:
+#             for ch in param.children():
+#                 get_leaf_rec(ch, leafs)
+#
+#     get_leaf_rec(param, leafs)
+#
+#     return leafs
+#
+# leafs = get_leaf_list(p)
+#
+# json_params = []
+# errors_type = []
+#
+# for elt in leafs:
+#     state = elt.saveState()
+#     # print(f'{elt}: {state}')
+#     # res = json.dumps(state)
+#     # json_params.append(res)
+#     try:
+#         res = json.dumps(state)
+#         json_params.append(res)
+#         # print(f'{elt}: {res}\nSuccess')
+#     except TypeError as e:
+#         print(f'{elt}: {state}\nError: {e}')
+#
+# json_param = json.dumps(p.saveState())
+
+# TODO Check if ser ndarray is ok + colormap linearize
 
 
-def valueChanging(param, value):
-    print("Value changing (not finalized): %s %s" % (param, value))
-    
-# Only listen for changes of the 'widget' child:
-for child in p.child('Example Parameters'):
-    if 'widget' in child.names:
-        child.child('widget').sigValueChanging.connect(valueChanging)
+############################################################################
+# END TESTS
+############################################################################
 
-def save():
-    global state
-    state = p.saveState()
-
-def restore():
-    global state
-    add = p['Save/Restore functionality', 'Restore State', 'Add missing items']
-    rem = p['Save/Restore functionality', 'Restore State', 'Remove extra items']
-    p.restoreState(state, addChildren=add, removeChildren=rem)
-p.param('Save/Restore functionality', 'Save State').sigActivated.connect(save)
-p.param('Save/Restore functionality', 'Restore State').sigActivated.connect(restore)
-
-
-## Create two ParameterTree widgets, both accessing the same data
-t = ParameterTree()
-t.setParameters(p, showTop=False)
-t.setWindowTitle('pyqtgraph example: Parameter Tree')
-t2 = ParameterTree()
-t2.setParameters(p, showTop=False)
-
-win = QtWidgets.QWidget()
-layout = QtWidgets.QGridLayout()
-win.setLayout(layout)
-layout.addWidget(QtWidgets.QLabel("These are two views of the same data. They should always display the same values."), 0,  0, 1, 2)
-layout.addWidget(t, 1, 0, 1, 1)
-layout.addWidget(t2, 1, 1, 1, 1)
-win.show()
-
-## test save/restore
-state = p.saveState()
-p.restoreState(state)
-compareState = p.saveState()
-assert pg.eq(compareState, state)
-
-
-if __name__ == '__main__':
-    pg.exec()
+#
+#
+# ## If anything changes in the tree, print a message
+# def change(param, changes):
+#     print("tree changes:")
+#     for param, change, data in changes:
+#         path = p.childPath(param)
+#         if path is not None:
+#             childName = '.'.join(path)
+#         else:
+#             childName = param.name()
+#         print('  parameter: %s'% childName)
+#         print('  change:    %s'% change)
+#         print('  data:      %s'% str(data))
+#         print('  ----------')
+#
+# p.sigTreeStateChanged.connect(change)
+#
+#
+# def valueChanging(param, value):
+#     print("Value changing (not finalized): %s %s" % (param, value))
+#
+# # Only listen for changes of the 'widget' child:
+# for child in p.child('Example Parameters'):
+#     if 'widget' in child.names:
+#         child.child('widget').sigValueChanging.connect(valueChanging)
+#
+# def save():
+#     global state
+#     state = p.saveState()
+#
+# def restore():
+#     global state
+#     add = p['Save/Restore functionality', 'Restore State', 'Add missing items']
+#     rem = p['Save/Restore functionality', 'Restore State', 'Remove extra items']
+#     p.restoreState(state, addChildren=add, removeChildren=rem)
+# p.param('Save/Restore functionality', 'Save State').sigActivated.connect(save)
+# p.param('Save/Restore functionality', 'Restore State').sigActivated.connect(restore)
+#
+#
+# ## Create two ParameterTree widgets, both accessing the same data
+# t = ParameterTree()
+# t.setParameters(p, showTop=False)
+# t.setWindowTitle('pyqtgraph example: Parameter Tree')
+# t2 = ParameterTree()
+# t2.setParameters(p, showTop=False)
+#
+# win = QtWidgets.QWidget()
+# layout = QtWidgets.QGridLayout()
+# win.setLayout(layout)
+# layout.addWidget(QtWidgets.QLabel("These are two views of the same data. They should always display the same values."), 0,  0, 1, 2)
+# layout.addWidget(t, 1, 0, 1, 1)
+# layout.addWidget(t2, 1, 1, 1, 1)
+# win.show()
+#
+# ## test save/restore
+# state = p.saveState()
+# p.restoreState(state)
+# compareState = p.saveState()
+# assert pg.eq(compareState, state)
+#
+#
+# if __name__ == '__main__':
+#     pg.exec()

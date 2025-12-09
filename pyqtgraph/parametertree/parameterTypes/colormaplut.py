@@ -22,3 +22,4 @@ class ColorMapLutParameter(Parameter):
         if v is not None and not isinstance(v, colormap.ColorMap):
             raise TypeError("Cannot set colormap parameter from object %r" % v)
         return v
+

@@ -4,6 +4,7 @@ import weakref
 from collections import OrderedDict
 
 from serializall.factory import SerializableFactory, SerializableBase
+from .utils import JsonEncoderDecoder
 
 from .. import functions as fn
 from ..Qt import QtCore
@@ -917,6 +918,15 @@ class Parameter(QtCore.QObject, SerializableBase):
         """ Implement the deserialization into a Parameter object from bytes """
         deserialized_param, remaining_bytes = ser_factory.get_apply_deserializer(bytes_string, only_object=False)
         return Parameter.create(**deserialized_param), remaining_bytes
+
+    @staticmethod
+    def to_json(parameter) -> str:
+        return JsonEncoderDecoder.json_encode(parameter.saveState())
+
+    @staticmethod
+    def from_json(json_str: str):
+        decoded_dict = JsonEncoderDecoder.json_decode(json_str)
+        return Parameter.create(**decoded_dict)
 
 
 class SignalBlocker(object):

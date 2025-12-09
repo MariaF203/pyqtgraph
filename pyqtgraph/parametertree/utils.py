@@ -1,6 +1,10 @@
-from collections import OrderedDict
+import json
+from json import JSONEncoder, JSONDecoder
+import numpy as np
+from ..Qt.QtGui import QColor
 
-from pyqtgraph.parametertree.Parameter import Parameter
+from .parameterTypes.colormap import ColorMap
+from Parameter import Parameter
 import pyqtgraph as pg
 
 def get_classes(p: Parameter) -> list:
@@ -46,3 +50,63 @@ def compare_parameters(p1: Parameter, p2: Parameter) -> bool:
         return False
 
     return get_classes(p1) == get_classes(p2)
+
+
+class JsonEncoderDecoder(JSONEncoder):
+    def default(self, o):
+
+        if isinstance(o, np.ndarray):
+            return dict({'__ndarray__': o.tolist()})
+
+        if isinstance(o, ColorMap):
+            attrs = dict()
+            attrs['pos'] = json.dumps(o.pos, cls=JsonEncoderDecoder)
+            attrs['color'] = o.color
+            attrs['mapping_mode'] = o.mapping_mode
+            attrs['name'] = o.name
+            attrs['stopsCache'] = o.stopsCache
+
+            return dict({'__colormap__': attrs})
+
+        return super().default(o)
+
+    def encode(self, o):
+        def hint_special(o):
+            if isinstance(o, tuple):
+                return dict({'__tuple__': [hint_special(e) for e in o]})
+            elif isinstance(o, list):
+                return [hint_special(e) for e in o]
+            elif isinstance(o, dict):
+                return {k: hint_special(v) for k,v in o.items()}
+            else:
+                return o
+
+        return super(JsonEncoderDecoder, self).encode(hint_special(o))
+
+    @staticmethod
+    def decode_hook(dct):
+        if '__ndarray__' in dct:
+            return np.array(dct['__ndarray__'])
+
+        if '__colormap__' in dct:
+            elt = dct['__colormap__']
+            rgba_color = []
+            for c in elt['color']:
+                rgba_color.append(QColor.fromRgbF(*c))
+
+            return ColorMap(pos=JSONDecoder(object_hook=JsonEncoderDecoder.decode_hook).decode(elt['pos']),
+                            color=rgba_color, mapping=elt['mapping_mode'], name=elt['name'])
+
+        if '__tuple__' in dct:
+            return tuple(dct['__tuple__'])
+
+        return dct
+
+    @staticmethod
+    def json_encode(o) -> str:
+        enc = JsonEncoderDecoder()
+        return enc.encode(o)
+
+    @staticmethod
+    def json_decode(json_str: str) -> dict:
+        return JSONDecoder(object_hook=JsonEncoderDecoder.decode_hook).decode(json_str)
